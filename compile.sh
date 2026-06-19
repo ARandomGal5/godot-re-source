@@ -12,4 +12,6 @@ pacman -Sy --noconfirm --needed \
   libglvnd \
   alsa-lib
 pacman -Sy --noconfirm --needed pulseaudio
+pacman -Syu glibc
+pacman -S linux-api-headers
 scons platform=linuxbsd
