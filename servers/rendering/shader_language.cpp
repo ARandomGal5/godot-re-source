@@ -1544,9 +1544,10 @@ bool ShaderLanguage::_find_identifier(const BlockNode *p_block, bool p_allow_rea
 		if (r_struct_name) {
 			*r_struct_name = shader->constants[p_identifier].struct_name;
 		}
-		if (r_constant_values) {
-			if (shader->constants[p_identifier].initializer && !shader->constants[p_identifier].initializer->get_values().is_empty()) {
-				*r_constant_values = shader->constants[p_identifier].initializer->get_values();
+		if (r_constant_values && shader->constants[p_identifier].initializer) {
+			Vector<Scalar> values = _get_node_values(p_block, p_function_info, shader->constants[p_identifier].initializer);
+			if (!values.is_empty()) {
+				*r_constant_values = values;
 			}
 		}
 		if (r_type) {
@@ -3603,8 +3604,8 @@ bool ShaderLanguage::_validate_function_call(BlockNode *p_block, const FunctionI
 
 	ERR_FAIL_COND_V(p_func->arguments[0]->type != Node::NODE_TYPE_VARIABLE, false);
 
-	StringName name = static_cast<VariableNode *>(p_func->arguments[0])->name.operator String();
-	StringName rname = static_cast<VariableNode *>(p_func->arguments[0])->rname.operator String();
+	StringName name = static_cast<VariableNode *>(p_func->arguments[0])->name.string();
+	StringName rname = static_cast<VariableNode *>(p_func->arguments[0])->rname.string();
 
 	for (int i = 1; i < p_func->arguments.size(); i++) {
 		args.push_back(p_func->arguments[i]->get_datatype());
@@ -5422,7 +5423,7 @@ bool ShaderLanguage::_get_completable_identifier(BlockNode *p_block, CompletionT
 		tk = _get_token();
 
 		if (tk.type == TK_IDENTIFIER) {
-			identifier = identifier.operator String() + tk.text.operator String();
+			identifier = identifier.string() + tk.text.string();
 		} else {
 			_set_tkpos(pos);
 		}

@@ -41,6 +41,7 @@
 #include "core/io/resource_loader.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "core/templates/rb_set.h"
 
 #ifdef TOOLS_ENABLED
 #include "editor/gdscript_docgen.h"
@@ -412,7 +413,7 @@ ScriptInstance *GDScript::instance_create(Object *p_this) {
 	}
 
 	if (top->native.is_valid()) {
-		if (!ClassDB::is_parent_class(p_this->get_class_name(), top->native->get_name())) {
+		if (!p_this->is_class(top->native->get_name())) {
 			if (EngineDebugger::is_active()) {
 				GDScriptLanguage::get_singleton()->debug_break_parse(_get_debug_path(), 1, "Script inherits from native type '" + String(top->native->get_name()) + "', so it can't be assigned to an object of type: '" + p_this->get_class() + "'");
 			}
@@ -1558,7 +1559,7 @@ bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 				callp(member->setter, &args, 1, err);
 				return err.error == Callable::CallError::CALL_OK;
 			} else {
-				members.write[member->index] = value;
+				members[member->index] = value;
 				return true;
 			}
 		}
@@ -2043,23 +2044,19 @@ const Variant GDScriptInstance::get_rpc_config() const {
 void GDScriptInstance::reload_members() {
 #ifdef DEBUG_ENABLED
 
-	Vector<Variant> new_members;
+	TightLocalVector<Variant> new_members;
 	new_members.resize(script->member_indices.size());
 
-	//pass the values to the new indices
+	// Transfer the old members into their new position.
 	for (KeyValue<StringName, GDScript::MemberInfo> &E : script->member_indices) {
 		if (member_indices_cache.has(E.key)) {
 			Variant value = members[member_indices_cache[E.key]];
-			new_members.write[E.value.index] = value;
+			new_members[E.value.index] = value;
 		}
 	}
+	members = std::move(new_members);
 
-	members.resize(new_members.size()); //resize
-
-	//apply
-	members = new_members;
-
-	//pass the values to the new indices
+	// Cache the new indices.
 	member_indices_cache.clear();
 	for (const KeyValue<StringName, GDScript::MemberInfo> &E : script->member_indices) {
 		member_indices_cache[E.key] = E.value.index;
