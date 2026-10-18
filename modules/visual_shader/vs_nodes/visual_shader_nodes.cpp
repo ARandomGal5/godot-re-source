@@ -31,9 +31,12 @@
 #include "visual_shader_nodes.h"
 #include "visual_shader_nodes.compat.inc"
 
+#include "core/config/project_settings.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "servers/rendering/rendering_server.h"
+
+#include "modules/modules_enabled.gen.h" // IWYU pragma: keep. For texture_streaming.
 
 ////////////// Vector Base
 
@@ -709,11 +712,11 @@ bool VisualShaderNodeTexture::is_input_port_default(int p_port, Shader::Mode p_m
 	return false;
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "tex");
 	dtp.params.push_back(texture);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -1076,11 +1079,11 @@ String VisualShaderNodeCurveTexture::generate_code(Shader::Mode p_mode, VisualSh
 	return code;
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeCurveTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeCurveTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "curve");
 	dtp.params.push_back(texture);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -1161,11 +1164,11 @@ String VisualShaderNodeCurveXYZTexture::generate_code(Shader::Mode p_mode, Visua
 	return code;
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeCurveXYZTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeCurveXYZTexture::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "curve3d");
 	dtp.params.push_back(texture);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -1314,11 +1317,11 @@ String VisualShaderNodeTexture2DArray::get_input_port_name(int p_port) const {
 	return VisualShaderNodeSample3D::get_input_port_name(p_port);
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeTexture2DArray::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeTexture2DArray::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "tex3d");
 	dtp.params.push_back(texture_array);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -1368,11 +1371,11 @@ String VisualShaderNodeTexture3D::get_input_port_name(int p_port) const {
 	return VisualShaderNodeSample3D::get_input_port_name(p_port);
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeTexture3D::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeTexture3D::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "tex3d");
 	dtp.params.push_back(texture);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -1457,11 +1460,11 @@ String VisualShaderNodeCubemap::get_output_port_name(int p_port) const {
 	return "color";
 }
 
-Vector<VisualShader::DefaultTextureParam> VisualShaderNodeCubemap::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
-	VisualShader::DefaultTextureParam dtp;
+Vector<ShaderGraph::DefaultTextureParam> VisualShaderNodeCubemap::get_default_texture_parameters(VisualShader::Type p_type, int p_id) const {
+	ShaderGraph::DefaultTextureParam dtp;
 	dtp.name = make_unique_id(p_type, p_id, "cube");
 	dtp.params.push_back(cube_map);
-	Vector<VisualShader::DefaultTextureParam> ret;
+	Vector<ShaderGraph::DefaultTextureParam> ret;
 	ret.push_back(dtp);
 	return ret;
 }
@@ -6803,6 +6806,33 @@ String VisualShaderNodeTextureParameterTriplanar::generate_global_per_node(Shade
 	code += "	varying vec3 triplanar_power_normal;\n";
 	code += "	varying vec3 triplanar_pos;\n";
 
+#ifdef MODULE_TEXTURE_STREAMING_ENABLED
+	// Texture streaming feedback for triplanar.
+	// Keep in sync with base material shader.
+	if (p_mode == Shader::MODE_SPATIAL && GLOBAL_GET_CACHED(bool, "rendering/textures/streaming/enabled")) {
+		code += "\n";
+		code += "	float triplanar_streaming_lod(vec3 p_pos_ddx, vec3 p_pos_ddy, vec3 p_weights) {\n";
+		code += "		vec2 uv_ddx;\n";
+		code += "		vec2 uv_ddy;\n";
+		code += "		if (p_weights.x >= p_weights.y && p_weights.x >= p_weights.z) {\n";
+		code += "			uv_ddx = p_pos_ddx.zy;\n";
+		code += "			uv_ddy = p_pos_ddy.zy;\n";
+		code += "		} else if (p_weights.y >= p_weights.z) {\n";
+		code += "			uv_ddx = p_pos_ddx.xz;\n";
+		code += "			uv_ddy = p_pos_ddy.xz;\n";
+		code += "		} else {\n";
+		code += "			uv_ddx = p_pos_ddx.xy;\n";
+		code += "			uv_ddy = p_pos_ddy.xy;\n";
+		code += "		}\n";
+		code += "		float uv_ddx_sq = dot(uv_ddx, uv_ddx);\n";
+		code += "		float uv_ddy_sq = dot(uv_ddy, uv_ddy);\n";
+		code += "		const float MAX_ANISOTROPY = 16.0;\n";
+		code += "		float footprint_sq = max(min(uv_ddx_sq, uv_ddy_sq), max(uv_ddx_sq, uv_ddy_sq) / (MAX_ANISOTROPY * MAX_ANISOTROPY));\n";
+		code += "		return 0.5 * log2(max(footprint_sq, 1e-30)) + 12.0;\n";
+		code += "	}\n";
+	}
+#endif
+
 	return code;
 }
 
@@ -6842,6 +6872,15 @@ String VisualShaderNodeTextureParameterTriplanar::generate_code(Shader::Mode p_m
 	} else {
 		code += "	" + p_output_vars[0] + " = triplanar_texture(" + id + ", " + p_input_vars[0] + ", " + p_input_vars[1] + ");\n";
 	}
+
+#ifdef MODULE_TEXTURE_STREAMING_ENABLED
+	bool streaming_enabled = GLOBAL_GET_CACHED(bool, "rendering/textures/streaming/enabled");
+	if (!p_for_preview && p_mode == Shader::MODE_SPATIAL && p_type == VisualShader::TYPE_FRAGMENT && streaming_enabled) {
+		const String weights = p_input_vars[0].is_empty() ? String("triplanar_power_normal") : p_input_vars[0];
+		const String pos = p_input_vars[1].is_empty() ? String("triplanar_pos") : p_input_vars[1];
+		code += "	STREAMING_LOD = triplanar_streaming_lod(dFdx(" + pos + "), dFdy(" + pos + "), " + weights + ");\n";
+	}
+#endif
 
 	return code;
 }

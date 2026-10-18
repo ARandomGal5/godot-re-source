@@ -44,6 +44,7 @@
 #endif
 
 #if defined(RD_ENABLED)
+#include "servers/rendering/renderer_rd/renderer_compositor_rd.h"
 #include "servers/rendering/rendering_device.h"
 #endif
 
@@ -252,6 +253,7 @@ class DisplayServerWindows : public DisplayServer {
 
 	KeyEvent key_event_buffer[KEY_EVENT_BUFFER_SIZE];
 	int key_event_pos;
+	bool legacy_shift_pressed[2] = {};
 
 	bool old_invalid;
 	int old_x, old_y;
@@ -363,7 +365,8 @@ class DisplayServerWindows : public DisplayServer {
 
 		// IME
 		HIMC im_himc;
-		Vector2 im_position;
+		Vector2i im_position;
+		Rect2i im_rect;
 		bool ime_active = false;
 		bool ime_in_progress = false;
 		bool ime_suppress_next_keyup = false;
@@ -551,10 +554,11 @@ class DisplayServerWindows : public DisplayServer {
 	HWND _find_window_from_process_id(ProcessID p_pid, HWND p_current_hwnd);
 
 	void initialize_tts() const;
-	void process_raw_input();
+	bool process_raw_input();
 	Vector2 _get_raw_mouse_motion(const RAWINPUT &p_raw, DisplayServerEnums::WindowID p_window_id);
 	void _process_raw_mouse_motion(const Vector2 &p_relative, bool p_left_button_down, DisplayServerEnums::WindowID p_window_id);
 	void _process_raw_input_event(const RAWINPUT &p_raw, DisplayServerEnums::WindowID p_window_id);
+	void _reconcile_shift_state(DisplayServerEnums::WindowID p_window_id);
 
 	struct ScreenHdrData {
 		bool hdr_supported = false;
@@ -711,6 +715,7 @@ public:
 
 	virtual void window_set_ime_active(const bool p_active, DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) override;
 	virtual void window_set_ime_position(const Point2i &p_pos, DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) override;
+	virtual void window_set_ime_rect(const Rect2i &p_rect, DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) override;
 
 	virtual int accessibility_should_increase_contrast() const override;
 	virtual int accessibility_should_reduce_animation() const override;
